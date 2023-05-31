@@ -1,29 +1,128 @@
 ---
 title: "Kepler_Exoplanet_Project"
-author: "Sofia Trogu"
+authors: "Sofia Trogu, Fairouz, and Aurianne"
 date: "2023-05-31"
 output: pdf_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+## Load Libraries
+```{r}
 ```
 
-## R Markdown
+## Download the Kepler dataset
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
+file_path <- "/Users/Sofia/Desktop/Kepler_Exoplanets/cumulative.csv"
+data <- read.csv(file_path)
+print(data)
+```
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+## Data Preprocessing
 
-```{r cars}
-summary(cars)
+```{r}
+# Find Empty Columns
+empty_columns <- which(colSums(is.na(data)) == nrow(data))
+
+names_of_empty_col<- names(data)[empty_columns]
+names_of_empty_col
+
+print(data)
+
+# Drop empty columns and unneeded ID columns
+data <- data[, !(names(data) %in% c('rowid', 'kepid', 'kepoi_name', 'kepler_name', 'koi_tce_delivname', 'koi_teq_err1', 'koi_teq_err2',
+                     'koi_period_err1', 'koi_period_err2', 
+                     'koi_time0bk_err1', 'koi_time0bk_err2', 
+                     'koi_impact_err1', 'koi_impact_err2',
+                     'koi_depth_err1', 'koi_depth_err2', 
+                     'koi_prad_err1', 'koi_prad_err2', 
+                     'koi_insol_err1', 'koi_insol_err2',
+                     'koi_steff_err1', 'koi_steff_err2', 
+                     'koi_slogg_err1', 'koi_slogg_err2', 
+                     'koi_srad_err1', 'koi_srad_err2', 
+                     'koi_duration_err1', 'koi_duration_err2'))]
+
+# Omit rows with NAs. We are left with 7,994 rows and 23 columns
+data <- na.omit(data)
+
+# Rename columns
+colnames(data)[colnames(data) == 'koi_disposition'] <- 'disposition'
+colnames(data)[colnames(data) == 'koi_pdisposition'] <- 'pdisposition'
+
+print(data)
+
+print(unique(data$disposition))
+print(unique(data$pdisposition))
+
+# Analyze relation of KOI Disposition and Predisposition to KOI score
+aggregated <- aggregate(data$koi_score ~ data$disposition, FUN = mean)
+colnames(aggregated) <- c("koi_disposition", "koi_score_mean")
+print(aggregated)
+
+aggregated2 <- aggregate(data$koi_score ~ data$pdisposition, FUN = mean)
+colnames(aggregated2) <- c("koi_pdisposition", "koi_score_mean")
+print(aggregated2)
+
+# Convert KOI Disposition (target variable) and KOI Predisposition to integer values
+data$disposition <- ifelse(data$disposition == "CONFIRMED", 0,
+                                    ifelse(data$disposition == "CANDIDATE", 1,
+                                           ifelse(data$disposition == "FALSE POSITIVE", 2, data$disposition)))
+
+data$pdisposition <- ifelse(data$pdisposition == "CANDIDATE", 1,
+                                     ifelse(data$pdisposition == "FALSE POSITIVE", 2, data$pdisposition))
+
+data <- as.data.frame(lapply(data, as.numeric))
+# 7803 x 44
+summary(data)
+```
+
+## Feature Selection
+```{r}
+
+# Build a Correlation Matrix
+cor_matrix <- cor(data)
+
+# Create a heatmap from the correlation matrix with blue, white, and green color scheme
+heatmap(cor_matrix, col = colorRampPalette(c("blue", "white", "green"))(100))
+
+# Add a color legend
+legend_colors <- c("blue", "white", "green")
+legend("right", legend = c(-1, 0, 1), fill = legend_colors, title = "Correlation")
+
+# Add a main title
+title(main = "Correlation Heatmap")
+
+max_pos_corr <- which(cor_matrix == max(cor_matrix), arr.ind = TRUE)
+feature1 <- rownames(cor_matrix)[max_pos_corr[1]]
+feature2 <- colnames(cor_matrix)[max_pos_corr[2]]
+max_neg_corr <- which(cor_matrix == min(cor_matrix), arr.ind = TRUE)
+feature3 <- rownames(cor_matrix)[max_neg_corr[1]]
+feature4 <- colnames(cor_matrix)[max_neg_corr[2]]
+cat("Features with the highest positive correlation:", feature1, "and", feature2, "\n")
+cat("Features with the highest negative correlation:", feature3, "and", feature4, "\n")
+```
+```{r}
+## Use backward selection method for feature selection
+
+linear_model <- lm(data$disposition ~ ., data = data)
+reduced_lm <- step(full_model, direction = "backward", criterion = "AIC")
+summary(reduced_lm)
+
+plot(reduced_lm)
+
+```
+## Regression
+```{r}
+```
+
+## Results and Prediction
+```{r}
 ```
 
 ## Including Plots
 
 You can also embed plots, for example:
 
-```{r pressure, echo=FALSE}
+```{r}
 plot(pressure)
 ```
 
